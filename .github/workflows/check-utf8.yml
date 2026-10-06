@@ -1,0 +1,30 @@
+name: Check UTF-8 in .cpp files
+
+on:
+  pull_request:
+
+jobs:
+  check-utf8:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check that all .cpp files are valid UTF-8
+        run: |
+          failed=0
+          while IFS= read -r -d '' file; do
+            # UTF-8 として不正なバイト列を含む行の行番号を列挙
+            lines=$(perl -MEncode -ne 'eval { decode("UTF-8", $_, Encode::FB_CROAK) }; print "$.\n" if $@' -- "$file")
+            if [ -n "$lines" ]; then
+              failed=1
+              for n in $lines; do
+                echo "::error file=$file,line=$n::Invalid UTF-8 byte sequence"
+              done
+            fi
+          done < <(git ls-files -z -- '*.cpp')
+
+          if [ "$failed" -ne 0 ]; then
+            echo "Some .cpp files are not valid UTF-8."
+            exit 1
+          fi
+          echo "All .cpp files are valid UTF-8."
