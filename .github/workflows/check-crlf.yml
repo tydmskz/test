@@ -1,0 +1,30 @@
+name: Check CRLF in .cpp files
+
+on:
+  push:
+
+jobs:
+  check-crlf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check that all .cpp files use CRLF line endings
+        run: |
+          failed=0
+          while IFS= read -r -d '' file; do
+            # LF の直前に CR がない行（= LF のみの改行）の行番号を列挙
+            lines=$(perl -ne 'print "$.\n" if /(?<!\r)\n\z/' -- "$file")
+            if [ -n "$lines" ]; then
+              failed=1
+              for n in $lines; do
+                echo "::error file=$file,line=$n::Line ending is not CRLF"
+              done
+            fi
+          done < <(git ls-files -z -- '*.cpp')
+
+          if [ "$failed" -ne 0 ]; then
+            echo "Some .cpp files contain non-CRLF line endings."
+            exit 1
+          fi
+          echo "All .cpp files use CRLF line endings."
